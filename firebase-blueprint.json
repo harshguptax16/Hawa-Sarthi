@@ -1,0 +1,205 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user workspace preferences, selected city, theme, and household sensitivity calibration.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the profile owner."
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "User display name without private email PII."
+        },
+        "selectedCity": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Active city monitored by the user."
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark"],
+          "description": "UI color theme preference."
+        },
+        "householdProfile": {
+          "type": "object",
+          "description": "Household sensitivity and lifestyle settings."
+        },
+        "joinedPledges": {
+          "type": "array",
+          "description": "Bounded list of joined community initiative IDs."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "selectedCity",
+        "theme",
+        "householdProfile",
+        "joinedPledges",
+        "updatedAt"
+      ]
+    },
+    "DailyImpactLog": {
+      "title": "DailyImpactLog",
+      "description": "Per-day household routine completions, PM2.5 reduction percentage, and avoided CO2 grams.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the log owner."
+        },
+        "dateId": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Local calendar date key in YYYY-MM-DD format."
+        },
+        "city": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "City for which actions were logged."
+        },
+        "completedIds": {
+          "type": "array",
+          "description": "Bounded array of completed routine item IDs."
+        },
+        "pm25ReductionPct": {
+          "type": "number",
+          "description": "Cumulative estimated PM2.5 exposure reduction percentage."
+        },
+        "co2SavedGrams": {
+          "type": "number",
+          "description": "Total grams of CO2e avoided on this date."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": [
+        "uid",
+        "dateId",
+        "city",
+        "completedIds",
+        "pm25ReductionPct",
+        "co2SavedGrams",
+        "updatedAt"
+      ]
+    },
+    "ChatMessageDoc": {
+      "title": "ChatMessageDoc",
+      "description": "Persisted multi-turn Gemini chatbot conversation message scoped to the owning user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the chat owner."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "description": "Message speaker role."
+        },
+        "personaRole": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Selected Sarthi chatbot advisor role."
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 60,
+          "description": "Gemini model identifier used for this turn."
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 8000,
+          "description": "Message text content."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when message was recorded."
+        }
+      },
+      "required": ["uid", "role", "personaRole", "model", "text", "createdAt"]
+    },
+    "CommunityPledge": {
+      "title": "CommunityPledge",
+      "description": "Verified neighborhood clean-air pledge posted by an authenticated user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the pledge author."
+        },
+        "authorName": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Public first name or display handle (no email PII)."
+        },
+        "city": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "City where the community pledge applies."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Carpool", "Zero-Burn", "School Zone", "Clean Heating"],
+          "description": "Community action category."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 140,
+          "description": "Short pledge summary."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "Practical neighborhood action note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of pledge creation."
+        }
+      },
+      "required": ["uid", "authorName", "city", "category", "title", "note", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private owner-only user profile and household calibration."
+    },
+    "/users/{userId}/impactLogs/{dateId}": {
+      "schema": { "$ref": "#/entities/DailyImpactLog" },
+      "description": "Owner-only daily routine impact and 7-day CO2 savings logs."
+    },
+    "/users/{userId}/chatMessages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessageDoc" },
+      "description": "Owner-only multi-turn Gemini chatbot conversation thread."
+    },
+    "/communityPledges/{pledgeId}": {
+      "schema": { "$ref": "#/entities/CommunityPledge" },
+      "description": "Shared city clean-air pledges readable by signed-in users and writable only by the verified owner."
+    }
+  }
+}

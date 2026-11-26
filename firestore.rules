@@ -1,0 +1,257 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default deny all unmatched paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable hardened helpers
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isValidHouseholdProfile(hp) {
+      return hp is map
+        && hp.keys().hasAll([
+          'youngChildren',
+          'seniors',
+          'asthmaOrRespiratory',
+          'pregnant',
+          'commuteMode',
+          'ventilationType',
+          'cookingFuel',
+          'language'
+        ])
+        && hp.keys().hasOnly([
+          'youngChildren',
+          'seniors',
+          'asthmaOrRespiratory',
+          'pregnant',
+          'commuteMode',
+          'ventilationType',
+          'cookingFuel',
+          'language'
+        ])
+        && hp.youngChildren is bool
+        && hp.seniors is bool
+        && hp.asthmaOrRespiratory is bool
+        && hp.pregnant is bool
+        && hp.commuteMode in ['car', 'twoWheeler', 'publicTransit', 'walkCycle', 'workFromHome']
+        && hp.ventilationType in ['sealedAC', 'naturalWindows', 'mixed']
+        && hp.cookingFuel in ['lpg', 'electricInduction', 'solidBiomass']
+        && hp.language in ['en', 'hi'];
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'selectedCity',
+          'theme',
+          'householdProfile',
+          'joinedPledges',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'selectedCity',
+          'theme',
+          'householdProfile',
+          'joinedPledges',
+          'updatedAt'
+        ])
+        && data.uid is string && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.selectedCity is string && data.selectedCity.size() >= 1 && data.selectedCity.size() <= 80
+        && data.theme in ['light', 'dark']
+        && isValidHouseholdProfile(data.householdProfile)
+        && data.joinedPledges is list && data.joinedPledges.size() <= 20
+        && (data.joinedPledges.size() == 0 || data.joinedPledges[0] is string)
+        && data.updatedAt == request.time;
+    }
+
+    function isValidImpactLog(data, userId, dateId) {
+      return data.keys().hasAll([
+          'uid',
+          'dateId',
+          'city',
+          'completedIds',
+          'pm25ReductionPct',
+          'co2SavedGrams',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'dateId',
+          'city',
+          'completedIds',
+          'pm25ReductionPct',
+          'co2SavedGrams',
+          'updatedAt'
+        ])
+        && data.uid is string && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.dateId is string && data.dateId.size() == 10 && data.dateId.matches('^\\d{4}-\\d{2}-\\d{2}$') && data.dateId == dateId
+        && data.city is string && data.city.size() >= 1 && data.city.size() <= 80
+        && data.completedIds is list && data.completedIds.size() <= 30
+        && (data.completedIds.size() == 0 || data.completedIds[0] is string)
+        && data.pm25ReductionPct is number && data.pm25ReductionPct >= 0 && data.pm25ReductionPct <= 100
+        && data.co2SavedGrams is number && data.co2SavedGrams >= 0 && data.co2SavedGrams <= 50000
+        && data.updatedAt == request.time;
+    }
+
+    function isValidChatMessage(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'role',
+          'personaRole',
+          'model',
+          'text',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'role',
+          'personaRole',
+          'model',
+          'text',
+          'createdAt'
+        ])
+        && data.uid is string && data.uid.size() <= 128 && data.uid == userId && data.uid == request.auth.uid
+        && data.role in ['user', 'assistant']
+        && data.personaRole is string && data.personaRole.size() >= 1 && data.personaRole.size() <= 60
+        && data.model is string && data.model.size() >= 1 && data.model.size() <= 60
+        && data.text is string && data.text.size() >= 1 && data.text.size() <= 8000
+        && data.createdAt == request.time;
+    }
+
+    function isValidCommunityPledge(data) {
+      return data.keys().hasAll([
+          'uid',
+          'authorName',
+          'city',
+          'category',
+          'title',
+          'note',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'authorName',
+          'city',
+          'category',
+          'title',
+          'note',
+          'createdAt'
+        ])
+        && data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80
+        && data.city is string && data.city.size() >= 1 && data.city.size() <= 80
+        && data.category in ['Carpool', 'Zero-Burn', 'School Zone', 'Clean Heating']
+        && data.title is string && data.title.size() >= 3 && data.title.size() <= 140
+        && data.note is string && data.note.size() >= 3 && data.note.size() <= 400
+        && data.createdAt is timestamp;
+    }
+
+    // Connection health check document (read-only)
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // User Profile (owner-only read/write, no list)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow create: if isValidId(userId) && isOwner(userId) && isValidUserProfile(incoming(), userId);
+      allow update: if isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'selectedCity',
+          'theme',
+          'householdProfile',
+          'joinedPledges',
+          'updatedAt'
+        ]);
+      allow delete: if isValidId(userId) && isOwner(userId);
+
+      // Subcollection: Daily Impact Logs (Master Gate on parent userId)
+      match /impactLogs/{dateId} {
+        allow get: if isValidId(userId) && isValidId(dateId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(dateId)
+          && isOwner(userId)
+          && isValidImpactLog(incoming(), userId, dateId)
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if isValidId(userId)
+          && isValidId(dateId)
+          && isOwner(userId)
+          && isValidImpactLog(incoming(), userId, dateId)
+          && incoming().uid == existing().uid
+          && incoming().dateId == existing().dateId
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'city',
+            'completedIds',
+            'pm25ReductionPct',
+            'co2SavedGrams',
+            'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidId(dateId) && isOwner(userId);
+      }
+
+      // Subcollection: Chat Messages (Master Gate on parent userId)
+      match /chatMessages/{messageId} {
+        allow get: if isValidId(userId) && isValidId(messageId) && isOwner(userId);
+        allow list: if isValidId(userId) && isOwner(userId) && resource.data.uid == request.auth.uid;
+        allow create: if isValidId(userId)
+          && isValidId(messageId)
+          && isOwner(userId)
+          && isValidChatMessage(incoming(), userId)
+          && exists(/databases/$(database)/documents/users/$(userId));
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(messageId) && isOwner(userId);
+      }
+    }
+
+    // Shared Community Clean-Air Pledges (verified users can read/list, only owner can update/delete)
+    match /communityPledges/{pledgeId} {
+      allow get: if isValidId(pledgeId) && isVerifiedUser();
+      allow list: if isVerifiedUser() && resource.data.city is string && resource.data.city.size() > 0;
+      allow create: if isValidId(pledgeId)
+        && isVerifiedUser()
+        && isValidCommunityPledge(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(pledgeId)
+        && isVerifiedUser()
+        && existing().uid == request.auth.uid
+        && isValidCommunityPledge(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['city', 'category', 'title', 'note']);
+      allow delete: if isValidId(pledgeId) && isVerifiedUser() && existing().uid == request.auth.uid;
+    }
+  }
+}

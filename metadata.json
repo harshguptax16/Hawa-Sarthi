@@ -1,0 +1,6 @@
+{
+  "name": "Hawa Sarthi",
+  "description": "GenAI-powered winter smog and urban air-quality assistant for families and communities, featuring grounded local AQI briefings, low-emission daily routines, indoor air diagnostics, DIY purifier blueprints, and voice guidance.",
+  "requestFramePermissions": ["microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
